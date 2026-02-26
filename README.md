@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI-Based Mental Health Monitoring System (Django)
 
 This is a beginner-friendly, presentation-ready web application for tracking journal-based emotional wellness.
@@ -95,3 +96,7 @@ Basic production checklist:
 - Keep `SECRET_KEY` in environment variable
 - Run migrations on server
 - Configure static files (`collectstatic`) if needed by host
+=======
+# mind_check
+app
+>>>>>>> 6003615d89cf839fb71e12bd1d2b3940f9089389

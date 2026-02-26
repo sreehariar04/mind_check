@@ -17,3 +17,8 @@ staticfiles/
 .vscode/
 .DS_Store
 Thumbs.db
+
+saved_roberta/
+*.safetensors
+*.pt
+*.bin

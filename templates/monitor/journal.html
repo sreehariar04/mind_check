@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journal | MindCheck</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body class="mindcheck-app journal-page">
+    {% include 'monitor/_sidebar.html' with active='journal' %}
+
+    <main class="main">
+        <section class="journal-wrap">
+            <header class="journal-header">
+                <h1>How are you feeling?</h1>
+                <p>Write freely — this space is private and secure.</p>
+            </header>
+
+            <article class="journal-card">
+                <form method="post">
+                    {% csrf_token %}
+                    {% if form.content.errors %}
+                    <div class="field-error">{{ form.content.errors.0 }}</div>
+                    {% endif %}
+                    <textarea id="content" name="content"
+                        placeholder="Share your thoughts, feelings, or anything on your mind today…"
+                        required>{{ form.content.value|default_if_none:'' }}</textarea>
+                    <div class="journal-footer">
+                        <span class="char-count"><span id="cc">0</span> characters</span>
+                        <button type="submit" class="btn-analyze" id="sb" disabled>Analyze →</button>
+                    </div>
+                </form>
+            </article>
+            <p class="privacy-note">🔒 Private and visible only to you</p>
+        </section>
+    </main>
+
+    <script>
+        const ta = document.getElementById('content');
+        const cc = document.getElementById('cc');
+        const sb = document.getElementById('sb');
+        ta.addEventListener('input', () => { const n = ta.value.trim().length; cc.textContent = n; sb.disabled = n === 0; });
+    </script>
+</body>
+
+</html>

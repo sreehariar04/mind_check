@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account | MindCheck</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #1e5c3a; --accent-mid: #2d7a52; --accent-light: #e8f5ee; --bg: #f0efe9; --text: #0f1a14; --muted: #6b7c72; --muted2: #a8b5ae; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text);
+            min-height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 48px 24px;
+        }
+
+        .wordmark { font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text); text-decoration: none; letter-spacing: -0.3px; margin-bottom: 28px; display: block; text-align: center; }
+
+        .card {
+            background: #fff; border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 22px; padding: 44px 44px 40px;
+            max-width: 460px; width: 100%;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.07);
+            animation: up 0.5s ease both;
+        }
+
+        @keyframes up { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
+
+        .card-title { font-family: 'DM Serif Display', serif; font-size: 28px; letter-spacing: -0.5px; margin-bottom: 6px; }
+        .card-sub { font-size: 14px; color: var(--muted); margin-bottom: 32px; line-height: 1.5; }
+
+        .field { margin-bottom: 18px; }
+        .field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin-bottom: 7px; }
+        .field input { width: 100%; padding: 12px 16px; border: 1px solid rgba(0,0,0,0.1); border-radius: 10px; font-size: 15px; font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text); outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        .field input:focus { border-color: #52b788; box-shadow: 0 0 0 3px rgba(82,183,136,0.12); }
+        .field input::placeholder { color: var(--muted2); }
+
+        .field-hint { font-size: 12px; color: var(--muted2); background: #f7f6f2; border-radius: 8px; padding: 9px 13px; margin-top: 7px; line-height: 1.5; }
+
+        .error { font-size: 13px; color: #c0392b; background: #fff2f2; border: 1px solid #f2d4d4; border-radius: 9px; padding: 10px 14px; margin-bottom: 18px; line-height: 1.5; }
+
+        .btn { width: 100%; padding: 14px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-top: 8px; transition: background 0.2s, transform 0.15s, box-shadow 0.2s; }
+        .btn:hover { background: var(--accent-mid); transform: translateY(-1px); box-shadow: 0 8px 24px rgba(30,92,58,0.22); }
+
+        .trust-note { background: #f7f6f2; border-radius: 10px; padding: 12px 16px; text-align: center; font-size: 13px; color: var(--muted); margin-top: 16px; line-height: 1.5; }
+
+        .divider { display: flex; align-items: center; gap: 12px; margin: 22px 0; font-size: 13px; color: var(--muted2); }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(0,0,0,0.08); }
+
+        .footer-link { text-align: center; font-size: 14px; color: var(--muted); }
+        .footer-link a { color: var(--accent); font-weight: 600; text-decoration: none; }
+        .footer-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <a href="{% url 'landing' %}" class="wordmark">MindCheck</a>
+
+    <article class="card">
+        <h1 class="card-title">Create Account</h1>
+        <p class="card-sub">Build a private space to understand your emotional wellbeing.</p>
+
+        {% if form.non_field_errors %}
+            <div class="error">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="field">
+                <label for="{{ form.first_name.id_for_label }}">First Name</label>
+                <input type="text" name="{{ form.first_name.name }}" id="{{ form.first_name.id_for_label }}" placeholder="Your first name" required>
+                {% if form.first_name.errors %}<div class="error" style="margin-top:6px;">{{ form.first_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="field">
+                <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+                <input type="text" name="{{ form.last_name.name }}" id="{{ form.last_name.id_for_label }}" placeholder="Your last name" required>
+                {% if form.last_name.errors %}<div class="error" style="margin-top:6px;">{{ form.last_name.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="field">
+                <label for="{{ form.email.id_for_label }}">Email</label>
+                <input type="email" name="{{ form.email.name }}" id="{{ form.email.id_for_label }}" placeholder="your@email.com" required autocomplete="email">
+                {% if form.email.errors %}<div class="error" style="margin-top:6px;">{{ form.email.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="field">
+                <label for="{{ form.password1.id_for_label }}">Password</label>
+                <input type="password" name="{{ form.password1.name }}" id="{{ form.password1.id_for_label }}" placeholder="••••••••" required autocomplete="new-password">
+                <div class="field-hint">At least 8 characters. Mix letters and numbers.</div>
+                {% if form.password1.errors %}<div class="error" style="margin-top:6px;">{{ form.password1.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="field">
+                <label for="{{ form.password2.id_for_label }}">Confirm Password</label>
+                <input type="password" name="{{ form.password2.name }}" id="{{ form.password2.id_for_label }}" placeholder="••••••••" required autocomplete="new-password">
+                {% if form.password2.errors %}<div class="error" style="margin-top:6px;">{{ form.password2.errors.0 }}</div>{% endif %}
+            </div>
+            <button type="submit" class="btn">Create Account</button>
+        </form>
+
+        <div class="trust-note">🔒 Your data is encrypted and stays private. We never share it.</div>
+
+        <div class="divider">or</div>
+        <p class="footer-link">Already have an account? <a href="{% url 'login' %}">Sign in</a></p>
+    </article>
+</body>
+</html>

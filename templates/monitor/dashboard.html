@@ -1,0 +1,188 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | MindCheck</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body class="mindcheck-app">
+    {% include 'monitor/_sidebar.html' with active='dashboard' %}
+
+    <main class="main">
+        <header class="page-head">
+            <h1>Analytics Overview</h1>
+            <p>Your emotional trends and journaling patterns</p>
+        </header>
+
+        <section class="metrics">
+            <article class="metric-card">
+                <span class="metric-label">Total Entries</span>
+                <div class="metric-value">{{ total_entries }}</div>
+            </article>
+            <article class="metric-card accent-card">
+                <span class="metric-label">Positive Ratio</span>
+                <div class="metric-value">{{ positive_ratio }}%</div>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Current Streak</span>
+                <div class="metric-value">{{ streak }}<span
+                        style="font-size:18px; font-family:'DM Sans'; font-weight:400; color:var(--muted); margin-left:4px;">days</span>
+                </div>
+            </article>
+        </section>
+
+        <section class="content-grid">
+            <article class="card">
+                <div class="card-head">
+                    <h2>{{ month }} {{ year }}</h2>
+                    <span>Monthly Overview</span>
+                </div>
+                <div class="cal-weekdays">
+                    {% for d in "MTWTFSS" %}<div class="cal-weekday">{{ d }}</div>{% endfor %}
+                </div>
+                <div class="cal-grid">
+                    {% for week in month_days %}
+                    {% for day in week %}
+                    {% if day.in_month %}
+                    <a href="{% url 'history_by_date' day.date_str %}"
+                        class="cal-day {% if day.is_today %}today{% endif %}"
+                        title="{{ day.emotion|default:'No entry' }}">
+                        <span class="cal-num">{{ day.day_number }}</span>
+                        {% if day.emotion %}
+                        <span class="cal-dot" style="
+                                            {% if day.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                                            {% if day.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                                            {% if day.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                                            {% if day.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                                            {% if day.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                                            {% if day.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                                            {% if day.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                                        ;"></span>
+                        {% endif %}
+                    </a>
+                    {% else %}
+                    <div class="cal-day inactive"><span class="cal-num">{{ day.day_number }}</span></div>
+                    {% endif %}
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+            </article>
+
+            <article class="card">
+                <div class="card-head">
+                    <h2>Emotion Distribution</h2>
+                    <span>All time</span>
+                </div>
+                <div class="donut-wrap">
+                    <canvas id="emotionChart"></canvas>
+                </div>
+                <div class="emo-legend">
+                    {% for row in emotion_counts %}
+                    <div class="emo-row">
+                        <div class="emo-dot-sm" style="
+                            {% if row.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                            {% if row.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                            {% if row.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                            {% if row.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                            {% if row.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                            {% if row.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                            {% if row.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                        ;"></div>
+                        <span class="emo-name">{{ row.emotion|title|cut:"_" }}</span>
+                        <div class="emo-bar-wrap">
+                            <div class="emo-bar-fill" style="width:{{ row.percent }}%;
+                                {% if row.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                                {% if row.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                                {% if row.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                                {% if row.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                                {% if row.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                                {% if row.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                                {% if row.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                            ;"></div>
+                        </div>
+                        <span class="emo-pct">{{ row.percent }}%</span>
+                    </div>
+                    {% empty %}
+                    <p style="font-size:13px; color:var(--muted2); text-align:center; padding:20px 0;">No data yet.
+                        Start journaling!</p>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="trend-card">
+            <div class="card-head">
+                <h2>Emotion Trend</h2>
+                <span>Recent entries</span>
+            </div>
+            <canvas id="trendChart" class="trend-canvas"></canvas>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const EMOTION_COLORS = {
+            'joy_excitement': '#F5C842',
+            'affection': '#E8799A',
+            'anger_disgust': '#E05A4E',
+            'sadness_grief': '#6B8FBE',
+            'fear_nervousness': '#9B6BB5',
+            'cognitive': '#5BA89C',
+            'neutral': '#9AA5B4',
+        };
+
+        const emotionData = {{ emotion_counts| safe }};
+        if (emotionData.length) {
+            new Chart(document.getElementById('emotionChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: emotionData.map(e => e.emotion),
+                    datasets: [{
+                        data: emotionData.map(e => e.count),
+                        backgroundColor: emotionData.map(e => EMOTION_COLORS[e.emotion] || '#9AA5B4'),
+                        borderColor: '#fff',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '72%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    data: [],
+                    borderColor: '#2d7a52',
+                    backgroundColor: 'rgba(45,122,82,0.05)',
+                    borderWidth: 2,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#2d7a52',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    </script>
+</body>
+
+</html>

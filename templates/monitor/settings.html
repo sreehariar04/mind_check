@@ -1,0 +1,74 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | MindCheck</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body class="mindcheck-app">
+    {% include 'monitor/_sidebar.html' with active='settings' %}
+
+    <main class="main">
+        {% if messages %}
+        <div class="alerts">
+            {% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}
+        </div>
+        {% endif %}
+
+        <section class="page-head">
+            <h1>Settings</h1>
+        </section>
+
+        <div class="settings-grid">
+            <article class="card">
+                <h2 class="section-title">Profile</h2>
+                <form method="post" class="app-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save">
+                    {{ profile_form.as_p }}
+                    <h3 class="pref-title">Preferences</h3>
+                    <div class="pref-fields">
+                        {% for field in preference_form %}
+                        <div class="pref-row">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="btn-save">Save Settings</button>
+                </form>
+            </article>
+
+            <div class="right-col">
+                <article class="side-card">
+                    <h2>Data Export</h2>
+                    <p>Download your full journal history as a CSV file.</p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="export">
+                        <button type="submit" class="btn-export">Export as CSV</button>
+                    </form>
+                </article>
+                <article class="side-card">
+                    <h3>Delete Account</h3>
+                    <p>This permanently removes your account and all journal data. This cannot be undone.</p>
+                    <form method="post"
+                        onsubmit="return confirm('Delete your account permanently? This cannot be undone.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete_account">
+                        <button type="submit" class="btn-danger">Delete Account</button>
+                    </form>
+                </article>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>

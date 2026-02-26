@@ -1,0 +1,155 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insights | MindCheck</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body class="mindcheck-app">
+    {% include 'monitor/_sidebar.html' with active='insights' %}
+
+    <main class="main">
+        <header class="page-head">
+            <h1>Emotional Insights</h1>
+            <p>Pattern analysis and trends based on your journal history</p>
+        </header>
+
+        {% if total_entries > 0 %}
+
+        <section class="metrics">
+            <div class="metric-card">
+                <span class="metric-label">Trend Direction</span>
+                <p class="metric-value">{{ trend_direction|capfirst }}</p>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Emotional Volatility</span>
+                <p class="metric-value">{{ volatility|floatformat:2 }}</p>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Dominant Emotion</span>
+                <p class="metric-value" style="font-size:22px; letter-spacing:-0.5px;">
+                    {% if dominant_emotion == 'joy_excitement' %}Joy &amp; Excitement
+                    {% elif dominant_emotion == 'affection' %}Affection
+                    {% elif dominant_emotion == 'anger_disgust' %}Anger &amp; Disgust
+                    {% elif dominant_emotion == 'sadness_grief' %}Sadness &amp; Grief
+                    {% elif dominant_emotion == 'fear_nervousness' %}Fear &amp; Nervousness
+                    {% elif dominant_emotion == 'cognitive' %}Curiosity &amp; Surprise
+                    {% else %}Neutral{% endif %}
+                </p>
+            </div>
+        </section>
+
+        <section class="two-col">
+            <article class="card">
+                <span class="card-label">Emotion Trend Over Time</span>
+                {% if trend_has_data %}
+                <div class="chart-wrap">
+                    <canvas id="trendChart"></canvas>
+                </div>
+                {% else %}
+                <div class="no-data-msg">Not enough data yet.<br>Create more entries to unlock your trend chart.</div>
+                {% endif %}
+            </article>
+
+            <article class="card">
+                <span class="card-label">Dominant Emotional States</span>
+                <div class="emo-states">
+                    {% for emo in emotion_counts %}
+                    <div class="emo-state-row">
+                        <div class="emo-dot" style="
+                            {% if emo.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                            {% if emo.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                            {% if emo.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                            {% if emo.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                            {% if emo.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                            {% if emo.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                            {% if emo.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                        ;"></div>
+                        <span class="emo-state-name">
+                            {% if emo.emotion == 'joy_excitement' %}Joy &amp; Excitement
+                            {% elif emo.emotion == 'affection' %}Affection
+                            {% elif emo.emotion == 'anger_disgust' %}Anger &amp; Disgust
+                            {% elif emo.emotion == 'sadness_grief' %}Sadness &amp; Grief
+                            {% elif emo.emotion == 'fear_nervousness' %}Fear &amp; Nervousness
+                            {% elif emo.emotion == 'cognitive' %}Curiosity &amp; Surprise
+                            {% else %}Neutral{% endif %}
+                        </span>
+                        <div class="emo-bar">
+                            <div class="emo-bar-fill" style="width:{{ emo.percent }}%;
+                                {% if emo.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                                {% if emo.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                                {% if emo.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                                {% if emo.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                                {% if emo.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                                {% if emo.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                                {% if emo.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                            ;"></div>
+                        </div>
+                        <div class="emo-state-meta">
+                            <span class="emo-count">{{ emo.count }}</span>
+                            <span class="emo-pct">{{ emo.percent }}%</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <article class="pattern-card">
+            <span class="card-label">Behavioural Pattern Analysis</span>
+            <p>{{ pattern_summary }}</p>
+        </article>
+
+        <article class="ai-card">
+            <span class="card-label">AI-Guided Recommendation</span>
+            <p>{{ ai_tip }}</p>
+        </article>
+
+        {% else %}
+        <div class="empty-card">
+            <p>No emotional data yet.<br>Start journaling to build your emotional profile and unlock insights.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {{ trend_labels|json_script:"tl" }}
+    {{ trend_scores|json_script:"ts" }}
+    <script>
+        const tl = JSON.parse(document.getElementById('tl').textContent);
+        const ts = JSON.parse(document.getElementById('ts').textContent);
+
+        if (tl && tl.length >= 2) {
+            new Chart(document.getElementById('trendChart'), {
+                type: 'line',
+                data: {
+                    labels: tl,
+                    datasets: [{ data: ts, label: 'Emotional Score', borderColor: '#2d7a52', backgroundColor: 'rgba(45,122,82,0.06)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#2d7a52', pointBorderColor: '#fff', pointBorderWidth: 2, tension: 0.3, fill: true }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15,26,20,0.9)', padding: 10, cornerRadius: 8, displayColors: false,
+                            callbacks: { label: (ctx) => { const e = ['-', 'Difficult', 'Low', 'Neutral', 'Good', 'Excellent']; return `Score: ${ctx.raw.toFixed(1)} (${e[Math.round(ctx.raw)] || '-'})`; } }
+                        }
+                    },
+                    scales: {
+                        y: { min: 0, max: 5, ticks: { stepSize: 1, color: '#a8b5ae', font: { size: 11 }, callback: (v) => ['-', 'Difficult', 'Low', 'Neutral', 'Good', 'Excellent'][Math.round(v)] || '' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+                        x: { ticks: { color: '#a8b5ae', font: { size: 11 } }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,93 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History | MindCheck</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Serif+Display:ital@0;1&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+
+<body class="mindcheck-app">
+    {% include 'monitor/_sidebar.html' with active='history' %}
+
+    <main class="main">
+        <header class="page-head">
+            {% if selected_date %}
+            <h1>{{ selected_date|date:"F d, Y" }}</h1>
+            <p><a href="{% url 'history' %}">← All entries</a></p>
+            {% else %}
+            <h1>Journal History</h1>
+            <p>All your entries and emotional records</p>
+            {% endif %}
+        </header>
+
+        {% if not selected_date %}
+        <div class="filter-card">
+            <form method="get" class="filter-row">
+                <input type="text" name="q" value="{{ query }}" placeholder="Search reflections…">
+                <select name="emotion">
+                    <option value="">All emotions</option>
+                    {% for value, label in emotion_choices %}
+                    <option value="{{ value }}" {% if emotion == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="date" value="{{ date }}">
+                <button type="submit" class="btn-filter">Filter</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="history-list">
+            {% if entries %}
+            {% for entry in entries %}
+            <article class="history-card">
+                <div class="hcard-left">
+                    <p class="hcard-text">{{ entry.content|truncatechars:220 }}</p>
+                    <div class="hcard-meta">
+                        {% if entry.emotion_result %}
+                        <span class="emo-pill {{ entry.emotion_result.emotion }}">
+                            <span class="dot" style="
+                                        {% if entry.emotion_result.emotion == 'joy_excitement' %}background:#F5C842{% endif %}
+                                        {% if entry.emotion_result.emotion == 'affection' %}background:#E8799A{% endif %}
+                                        {% if entry.emotion_result.emotion == 'anger_disgust' %}background:#E05A4E{% endif %}
+                                        {% if entry.emotion_result.emotion == 'sadness_grief' %}background:#6B8FBE{% endif %}
+                                        {% if entry.emotion_result.emotion == 'fear_nervousness' %}background:#9B6BB5{% endif %}
+                                        {% if entry.emotion_result.emotion == 'cognitive' %}background:#5BA89C{% endif %}
+                                        {% if entry.emotion_result.emotion == 'neutral' %}background:#9AA5B4{% endif %}
+                                    ;"></span>
+                            {{ entry.emotion_result.display_emotion }}
+                        </span>
+                        <span class="hcard-conf">{{ entry.emotion_result.confidence_percent }}%</span>
+                        {% else %}
+                        <span class="emo-pill pending">Pending</span>
+                        {% endif %}
+                        <span class="hcard-date">{{ entry.created_at|date:'M d, Y · H:i' }}</span>
+                    </div>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="entry_id" value="{{ entry.id }}">
+                    <button type="submit" class="delete-btn" title="Delete">×</button>
+                </form>
+            </article>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                {% if selected_date %}
+                <p>No entries for <strong>{{ selected_date|date:"F d, Y" }}</strong></p>
+                <a href="{% url 'journal' %}">+ New Entry</a>
+                {% else %}
+                <p>No entries matched your search.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </main>
+</body>
+
+</html>

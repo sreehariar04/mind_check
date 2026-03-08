@@ -1469,10 +1469,8 @@ html {
 
 /* ==========================================================================
    APP STYLES — DM Sans / Green Design System
-   (migrated from inline <style> blocks — DO NOT MODIFY the design)
    ========================================================================== */
 
-/* ── Shared Variables (override root for app pages) ── */
 .mindcheck-app {
     --bg: #f0efe9;
     --surface: #ffffff;
@@ -1512,7 +1510,6 @@ html {
     min-height: 100vh;
 }
 
-/* ── Sidebar ── */
 .mindcheck-app .sidebar {
     width: var(--sidebar-w);
     min-height: 100vh;
@@ -1603,14 +1600,12 @@ html {
     background: #fdf0ef;
 }
 
-/* ── Main Content ── */
 .mindcheck-app .main {
     margin-left: var(--sidebar-w);
     flex: 1;
     padding: 44px 48px;
 }
 
-/* ── Page Header (shared) ── */
 .mindcheck-app .page-head {
     margin-bottom: 28px;
 }
@@ -1637,7 +1632,6 @@ html {
     text-decoration: underline;
 }
 
-/* ── Scrollbar ── */
 .mindcheck-app ::-webkit-scrollbar {
     width: 4px;
 }
@@ -1647,7 +1641,6 @@ html {
     border-radius: 99px;
 }
 
-/* ── JOURNAL PAGE ── */
 .mindcheck-app .journal-wrap {
     width: 100%;
     max-width: 760px;
@@ -1755,7 +1748,6 @@ html {
     margin-top: 16px;
 }
 
-/* Journal page — center layout */
 .mindcheck-app.journal-page .main {
     display: flex;
     flex-direction: column;
@@ -1764,7 +1756,6 @@ html {
     min-height: 100vh;
 }
 
-/* ── DASHBOARD PAGE ── */
 .mindcheck-app .metrics {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1850,7 +1841,6 @@ html {
     color: var(--muted2);
 }
 
-/* Calendar */
 .mindcheck-app .cal-weekdays {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -1925,7 +1915,6 @@ html {
     border-radius: 50%;
 }
 
-/* Emotion distribution legend */
 .mindcheck-app .donut-wrap {
     max-width: 200px;
     height: 200px;
@@ -1991,7 +1980,6 @@ html {
     height: 200px;
 }
 
-/* ── HISTORY PAGE ── */
 .mindcheck-app .filter-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -2102,7 +2090,6 @@ html {
     flex-wrap: wrap;
 }
 
-/* Emotion pill */
 .mindcheck-app .emo-pill {
     display: inline-flex;
     align-items: center;
@@ -2223,7 +2210,6 @@ html {
     background: var(--accent-mid);
 }
 
-/* ── INSIGHTS PAGE ── */
 .mindcheck-app .two-col {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2353,7 +2339,6 @@ html {
     line-height: 1.7;
 }
 
-/* ── EMOTIONAL RESULTS PAGE ── */
 .mindcheck-app .success-banner {
     display: flex;
     align-items: center;
@@ -2564,7 +2549,6 @@ html {
     transform: translateY(-1px);
 }
 
-/* ── SETTINGS PAGE ── */
 .mindcheck-app .alerts {
     margin-bottom: 24px;
     display: flex;
@@ -2752,6 +2736,10 @@ html {
 }
 
 /* ── LANDING PAGE ── */
+/* FIX: removed overflow:hidden from .hero — it was clipping the badge's
+   mc-fadeDown animation (starts at translateY(-12px), got cut off at top).
+   Added padding-top on .hero-inner to compensate for navbar height.        */
+
 .mindcheck-landing {
     font-family: 'DM Sans', sans-serif;
     background: #f0efeb;
@@ -2794,9 +2782,11 @@ html {
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 80px 24px;
+    /* FIX: was padding: 80px 24px + overflow: hidden
+       overflow:hidden clipped the badge fade-down animation.
+       Increased top padding to clear the fixed navbar (60px) + breathing room. */
+    padding: 100px 24px 80px;
     position: relative;
-    overflow: hidden;
 }
 
 .mindcheck-landing .hero-glow {
@@ -2830,6 +2820,8 @@ html {
     color: #555555;
     font-weight: 500;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+    /* FIX: added margin-top so badge has space to animate in from above */
+    margin-top: 20px;
     margin-bottom: 36px;
     animation: mc-fadeDown 0.6s ease both;
 }
@@ -2924,44 +2916,21 @@ html {
 }
 
 @keyframes mc-pulse {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.4;
-        transform: scale(0.8);
-    }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
 }
 
 @keyframes mc-fadeDown {
-    from {
-        opacity: 0;
-        transform: translateY(-12px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes mc-fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(16px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── AUTH PAGES (Login / Register) ── */
+/* ── AUTH PAGES ── */
 .mindcheck-auth {
     font-family: 'DM Sans', sans-serif;
     background: #f0efe9;
@@ -3003,15 +2972,8 @@ html {
 }
 
 @keyframes mc-authUp {
-    from {
-        opacity: 0;
-        transform: translateY(16px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .mindcheck-auth .card-title {
@@ -3150,26 +3112,16 @@ html {
     text-decoration: underline;
 }
 
-/* ── Responsive (App Pages) ── */
+/* ── Responsive ── */
 @media (max-width: 1100px) {
-    .mindcheck-app .content-grid {
-        grid-template-columns: 1fr;
-    }
-
+    .mindcheck-app .content-grid { grid-template-columns: 1fr; }
     .mindcheck-app .two-col,
-    .mindcheck-app .metrics {
-        grid-template-columns: 1fr;
-    }
-
-    .mindcheck-app .results-grid {
-        grid-template-columns: 1fr;
-    }
+    .mindcheck-app .metrics { grid-template-columns: 1fr; }
+    .mindcheck-app .results-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 1000px) {
-    .mindcheck-app .settings-grid {
-        grid-template-columns: 1fr;
-    }
+    .mindcheck-app .settings-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 900px) {
@@ -3180,17 +3132,7 @@ html {
         border-right: none;
         border-bottom: 1px solid var(--border);
     }
-
-    .mindcheck-app .main {
-        margin-left: 0;
-        padding: 28px 20px;
-    }
-
-    .mindcheck-app .metrics {
-        grid-template-columns: 1fr;
-    }
-
-    .mindcheck-app .metric-boxes {
-        grid-template-columns: 1fr;
-    }
+    .mindcheck-app .main { margin-left: 0; padding: 28px 20px; }
+    .mindcheck-app .metrics { grid-template-columns: 1fr; }
+    .mindcheck-app .metric-boxes { grid-template-columns: 1fr; }
 }

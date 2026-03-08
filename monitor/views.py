@@ -521,7 +521,27 @@ def _build_month_calendar(entries_queryset):
     for entry in month_entries:
         date_key = timezone.localtime(entry.created_at).date()
         if date_key not in emotion_by_date:
-            emotion_by_date[date_key] = getattr(entry.emotion_result, 'emotion', None)
+            try:
+                emotion_by_date[date_key] = entry.emotion_result.emotion
+            except Exception:
+                emotion_by_date[date_key] = None
+
+    calendar_weeks = []
+    for week in calendar.Calendar(firstweekday=0).monthdatescalendar(year, month):
+        calendar_weeks.append([
+            {
+                'day':        day,
+                'day_number': day.day,
+                'in_month':   day.month == month,
+                'is_today':   day == today,
+                'emotion':    emotion_by_date.get(day),
+                'date_str':   day.strftime('%Y-%m-%d'),
+            }
+            for day in week
+        ])
+
+    return calendar_weeks, today.strftime('%B %Y')
+
 
     calendar_weeks = []
     for week in calendar.Calendar(firstweekday=0).monthdatescalendar(year, month):

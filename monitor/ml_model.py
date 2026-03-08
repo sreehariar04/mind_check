@@ -1,28 +1,3 @@
-"""
-monitor/ml_model.py
--------------------
-Loads the fine-tuned RoBERTa model (saved_roberta/) and label encoder
-(label_encoder.pkl) produced by the Colab training notebook, then
-exposes a single public function:
-
-    predict_emotion(text: str) -> dict
-
-Return format (matches what the existing Django views already expect):
-    {
-        "emotion":    str,   # e.g. "joy_excitement"
-        "confidence": float, # 0.0 – 1.0, rounded to 4 d.p.
-        "top3":       dict,  # {"emotion_name": score, ...} top-3 predictions
-    }
-
-Model files expected at (relative to manage.py / project root):
-    ./saved_roberta/          ← saved_pretrained() output folder
-    ./label_encoder.pkl       ← joblib.dump(le, ...)
-
-To change the path, set the env vars:
-    MIND_CHECK_MODEL_DIR   (default: saved_roberta)
-    MIND_CHECK_LE_PATH     (default: label_encoder.pkl)
-"""
-
 import os
 import re
 import logging
@@ -34,24 +9,23 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Paths  (override via environment variables)
-# ---------------------------------------------------------------------------
-BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_DIR  = os.environ.get("MIND_CHECK_MODEL_DIR",
-                            os.path.join(BASE_DIR, "saved_roberta"))
-LE_PATH    = os.environ.get("MIND_CHECK_LE_PATH",
-                            os.path.join(BASE_DIR, "label_encoder.pkl"))
+BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_DIR = os.environ.get("MIND_CHECK_MODEL_DIR", os.path.join(BASE_DIR, "saved_roberta"))
+LE_PATH   = os.environ.get("MIND_CHECK_LE_PATH",   os.path.join(BASE_DIR, "label_encoder.pkl"))
 
-MAX_SEQ_LEN = 128
+MAX_SEQ_LEN          = 128
+CONFIDENCE_THRESHOLD = 0.35
+TOP2_GAP_THRESHOLD   = 0.10
 
-# If the model's top prediction is below this confidence, fall back to neutral.
-# Prevents overconfident mislabelling of mundane / ambiguous entries.
-CONFIDENCE_THRESHOLD = 0.45
+NEGATION_TRIGGERS = r"\b(not|never|no|zero|nothing|hardly|stopped|would not|is not|do not|does not|cannot|can not)\b"
+POSITIVE_TRIGGERS = r"\b(happy|excited|love|amazing|wonderful|fantastic|good|joy|fine)\b"
+POSITIVE_EMOTIONS = {'joy_excitement', 'affection'}
 
-# ---------------------------------------------------------------------------
-# Text cleaning  (mirrors the training notebook exactly)
-# ---------------------------------------------------------------------------
+NEGATIVE_CONTEXT  = r"\b(ruin|ruined|destroy|destroyed|mess|wreck|wrecked|hate|awful|terrible|worst|disappoint|disappointed|pathetic|useless)\b"
+SARCASM_MARKERS   = r"\b(always|never|manage to|somehow|every single|typical)\b"
+
+DECLINING_PATTERN = r"\b(not sure anymore|not so sure|not okay|have not been|haven't been|used to be|not the same|falling apart|losing it)\b"
+
 CONTRACTIONS = {
     "won't":"will not","can't":"cannot","don't":"do not",
     "doesn't":"does not","didn't":"did not","isn't":"is not",
@@ -66,6 +40,7 @@ CONTRACTIONS = {
     "what's":"what is","let's":"let us",
 }
 
+
 def _clean_text(text: str) -> str:
     if not isinstance(text, str) or not text.strip():
         return ""
@@ -76,29 +51,51 @@ def _clean_text(text: str) -> str:
     text = re.sub(r'r/\w+|u/\w+', '', text)
     for c, e in CONTRACTIONS.items():
         text = text.replace(c, e)
-    text = re.sub(r'[^\w\s!?]', ' ', text)
-    text = re.sub(r'!{2,}', '!!', text)
-    text = re.sub(r'\?{2,}', '??', text)
+    text = re.sub(r"[^a-zA-Z0-9!?.', ]+", ' ', text)
+    text = re.sub(r'!{2,}', '!', text)
+    text = re.sub(r'\?{2,}', '?', text)
     text = re.sub(r'(\w)\1{2,}', r'\1\1', text)
     text = re.sub(r'\b\d+\b', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
-# ---------------------------------------------------------------------------
-# Lazy model loading  (loaded once on first call, not at import time)
-# ---------------------------------------------------------------------------
+def _split_sentences(text: str) -> list:
+    """Split on . ! ? while keeping the delimiter. Filters out short fragments."""
+    raw = re.split(r'(?<=[.!?])\s+', text.strip())
+    sentences = [s.strip() for s in raw if len(s.strip().split()) >= 3]
+    return sentences if sentences else [text]
+
+
+def _has_negated_positive(text: str) -> bool:
+    for m in re.finditer(NEGATION_TRIGGERS, text):
+        window = text[m.start(): m.end() + 25]
+        if re.search(POSITIVE_TRIGGERS, window):
+            return True
+    return False
+
+
+def _has_sarcastic_affection(text: str) -> bool:
+    if not re.search(r'\blove\b', text):
+        return False
+    return bool(re.search(NEGATIVE_CONTEXT, text) or re.search(SARCASM_MARKERS, text))
+
+
+def _has_declining_wellbeing(text: str) -> bool:
+    return bool(re.search(DECLINING_PATTERN, text))
+
+
 _tokenizer = None
 _model     = None
 _le        = None
 _device    = None
 
+
 def _load_model():
-    """Load tokenizer, model and label-encoder into module-level globals."""
     global _tokenizer, _model, _le, _device
 
     if _model is not None:
-        return  # already loaded
+        return
 
     if not os.path.isdir(MODEL_DIR):
         raise FileNotFoundError(
@@ -118,83 +115,138 @@ def _load_model():
     _model.eval()
     _le        = joblib.load(LE_PATH)
 
-    logger.info("mind_check: RoBERTa model loaded on %s — classes: %s",
+    logger.info("mind_check: RoBERTa model loaded on %s -- classes: %s",
                 _device, list(_le.classes_))
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+def _infer_probs(text: str) -> np.ndarray:
+    """Run TTA inference on a single cleaned text. Returns averaged probs."""
+    variants  = [text, text.lower(), text.rstrip('.') + '.']
+    all_probs = []
+    for variant in variants:
+        inputs = _tokenizer(
+            variant,
+            return_tensors="pt",
+            truncation=True,
+            max_length=MAX_SEQ_LEN,
+            padding=True,
+        )
+        inputs = {k: v.to(_device) for k, v in inputs.items()}
+        with torch.no_grad():
+            probs = torch.softmax(_model(**inputs).logits, dim=1)[0].cpu().numpy()
+        all_probs.append(probs)
+    return np.mean(all_probs, axis=0)
+
+
+def _apply_rules(probs: np.ndarray, cleaned: str):
+    """Apply post-inference suppression rules. Returns (adjusted_probs, fired_flag)."""
+    fired = False
+
+    if _has_negated_positive(cleaned):
+        for cls_name in POSITIVE_EMOTIONS:
+            if cls_name in _le.classes_:
+                probs[list(_le.classes_).index(cls_name)] *= 0.4
+        probs = probs / probs.sum()
+        fired = True
+        logger.info("mind_check: negation suppression for: '%s'", cleaned[:60])
+
+    if _has_sarcastic_affection(cleaned):
+        if 'affection' in _le.classes_:
+            probs[list(_le.classes_).index('affection')] *= 0.2
+        probs = probs / probs.sum()
+        fired = True
+        logger.info("mind_check: sarcastic affection suppression for: '%s'", cleaned[:60])
+
+    if _has_declining_wellbeing(cleaned):
+        if 'cognitive' in _le.classes_:
+            probs[list(_le.classes_).index('cognitive')] *= 0.3
+        if 'sadness_grief' in _le.classes_:
+            probs[list(_le.classes_).index('sadness_grief')] *= 1.5
+        probs = probs / probs.sum()
+        logger.info("mind_check: declining wellbeing for: '%s'", cleaned[:60])
+
+    return probs, fired
+
+
 def predict_emotion(text: str) -> dict:
-    """
-    Predict the emotion group for a journal entry.
-
-    Parameters
-    ----------
-    text : str
-        Raw user-submitted journal text.
-
-    Returns
-    -------
-    dict with keys:
-        emotion    (str)  — predicted emotion group label
-        confidence (float)— probability of the top prediction (0–1)
-        top3       (dict) — top-3 {label: probability} pairs
-    """
     _load_model()
 
-    cleaned = _clean_text(text)
-    if not cleaned:
-        return {"emotion": "neutral", "confidence": 1.0,
-                "top3": {"neutral": 1.0}}
+    cleaned_full = _clean_text(text)
+    if not cleaned_full:
+        return {"emotion": "neutral", "confidence": 1.0, "top3": {"neutral": 1.0}}
 
-    inputs = _tokenizer(
-        cleaned,
-        return_tensors="pt",
-        truncation=True,
-        max_length=MAX_SEQ_LEN,
-        padding=True,
-    )
-    inputs = {k: v.to(_device) for k, v in inputs.items()}
+    sentences = _split_sentences(text)
 
-    with torch.no_grad():
-        logits = _model(**inputs).logits
+    if len(sentences) <= 1:
+        # Short single-sentence input
+        probs, negation_fired = _apply_rules(_infer_probs(cleaned_full), cleaned_full)
 
-    probs      = torch.softmax(logits, dim=1)[0].cpu().numpy()
-    pred_idx   = int(np.argmax(probs))
-    confidence = round(float(probs[pred_idx]), 4)
+    else:
+        # Multi-sentence journal entry:
+        # Classify each sentence individually, weight the last sentence 2x
+        # because journal entries tend to end on the dominant emotional state
+        n           = len(sentences)
+        weights     = [1.0] * n
+        weights[-1] = 2.0
+        total_w     = sum(weights)
 
-    top3_pairs = sorted(
-        zip(_le.classes_, probs),
-        key=lambda x: -x[1]
-    )[:3]
+        combined       = np.zeros(len(_le.classes_))
+        negation_fired = False
 
-    # Fall back to neutral when the model is not confident enough.
+        for i, sent in enumerate(sentences):
+            cleaned_sent = _clean_text(sent)
+            if not cleaned_sent:
+                continue
+            probs_sent, fired = _apply_rules(_infer_probs(cleaned_sent), cleaned_sent)
+            combined += probs_sent * (weights[i] / total_w)
+            if fired:
+                negation_fired = True
+
+        # Also apply rules on full text to catch cross-sentence patterns
+        # e.g. "putting on a smile... sit in silence"
+        _, full_fired = _apply_rules(_infer_probs(cleaned_full), cleaned_full)
+        if full_fired:
+            negation_fired = True
+
+        probs = combined / combined.sum()
+
+    pred_idx        = int(np.argmax(probs))
+    all_pairs       = sorted(zip(_le.classes_, probs), key=lambda x: -x[1])
+    top3_dict       = {k: round(float(v), 4) for k, v in all_pairs[:3]}
     predicted_label = _le.inverse_transform([pred_idx])[0]
-    if confidence < CONFIDENCE_THRESHOLD:
+    confidence      = round(float(probs[pred_idx]), 4)
+
+    top2_gap = all_pairs[0][1] - all_pairs[1][1]
+    if confidence < CONFIDENCE_THRESHOLD or top2_gap < TOP2_GAP_THRESHOLD:
         predicted_label = "neutral"
 
-    return {
+    result = {
         "emotion":    predicted_label,
         "confidence": confidence,
-        "top3":       {k: round(float(v), 4) for k, v in top3_pairs},
+        "top3":       top3_dict,
     }
+    if negation_fired:
+        result["negation_override"] = True
+
+    return result
 
 
-# ---------------------------------------------------------------------------
-# Quick smoke-test  (python monitor/ml_model.py)
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     samples = [
-        "I just got promoted, I can't believe it!",
-        "Everything feels so pointless lately.",
-        "Why would anyone do something like that??",
-        "I feel so scared and nervous about tomorrow.",
-        "I love how caring and kind you are.",
+        ("I've been putting on a smile at work but when I get home I just sit in silence.", "sadness_grief"),
+        ("Today was great on paper. Good weather, good food, good company. I still felt off though.", "sadness_grief"),
+        ("Went to the store. Made dinner. Watched something. Went to bed.", "neutral"),
+        ("I snapped at someone I care about today. I feel terrible but also I was right.", "sadness_grief"),
+        ("Had a really good day today, got a lot done and actually felt proud of myself for once.", "joy_excitement"),
+        ("Couldn't get out of bed until noon. Not because I was tired, just didn't see the point.", "sadness_grief"),
+        ("I just got promoted, I can't believe it!", "joy_excitement"),
+        ("I love how you always manage to ruin everything.", "anger_disgust"),
+        ("I thought I was okay but I'm not sure anymore.", "sadness_grief"),
+        ("Not bad at all, actually really enjoyed it.", "joy_excitement"),
     ]
-    for s in samples:
-        r = predict_emotion(s)
-        print(f"Text      : {s!r}")
-        print(f"Emotion   : {r['emotion']}  ({r['confidence']:.1%})")
-        print(f"Top 3     : {r['top3']}\n")
+    print(f"\n{'Input':<70}  {'Expected':<30}  {'Got':<25}  Conf")
+    print("-" * 145)
+    for text, expected in samples:
+        r = predict_emotion(text)
+        print(f"{text:<70}  {expected:<30}  {r['emotion']:<25}  {r['confidence']:.1%}")

@@ -57,14 +57,14 @@
                         <span class="cal-num">{{ day.day_number }}</span>
                         {% if day.emotion %}
                         <span class="cal-dot" style="
-                                            {% if day.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
-                                            {% if day.emotion == 'affection' %}background:var(--c-affection){% endif %}
-                                            {% if day.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
-                                            {% if day.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
-                                            {% if day.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
-                                            {% if day.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
-                                            {% if day.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
-                                        ;"></span>
+                            {% if day.emotion == 'joy_excitement' %}background:var(--c-joy){% endif %}
+                            {% if day.emotion == 'affection' %}background:var(--c-affection){% endif %}
+                            {% if day.emotion == 'anger_disgust' %}background:var(--c-anger){% endif %}
+                            {% if day.emotion == 'sadness_grief' %}background:var(--c-sadness){% endif %}
+                            {% if day.emotion == 'fear_nervousness' %}background:var(--c-fear){% endif %}
+                            {% if day.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
+                            {% if day.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
+                        ;"></span>
                         {% endif %}
                     </a>
                     {% else %}
@@ -95,6 +95,7 @@
                             {% if row.emotion == 'cognitive' %}background:var(--c-cognitive){% endif %}
                             {% if row.emotion == 'neutral' %}background:var(--c-neutral){% endif %}
                         ;"></div>
+                        {# FIX: replace|cut:"_" with a proper display — "joy_excitement" -> "Joy Excitement" #}
                         <span class="emo-name">{{ row.emotion|title|cut:"_" }}</span>
                         <div class="emo-bar-wrap">
                             <div class="emo-bar-fill" style="width:{{ row.percent }}%;
@@ -129,16 +130,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const EMOTION_COLORS = {
-            'joy_excitement': '#F5C842',
-            'affection': '#E8799A',
-            'anger_disgust': '#E05A4E',
-            'sadness_grief': '#6B8FBE',
-            'fear_nervousness': '#9B6BB5',
-            'cognitive': '#5BA89C',
-            'neutral': '#9AA5B4',
+            'joy_excitement':  '#F5C842',
+            'affection':       '#E8799A',
+            'anger_disgust':   '#E05A4E',
+            'sadness_grief':   '#6B8FBE',
+            'fear_nervousness':'#9B6BB5',
+            'cognitive':       '#5BA89C',
+            'neutral':         '#9AA5B4',
         };
 
-        const emotionData = {{ emotion_counts| safe }};
+        // ── Donut chart ───────────────────────────────────────────────────
+        const emotionData = {{ emotion_counts|safe }};
         if (emotionData.length) {
             new Chart(document.getElementById('emotionChart'), {
                 type: 'doughnut',
@@ -160,12 +162,18 @@
             });
         }
 
+        // ── Trend chart — uses real data from view context ────────────────
+        // FIX: was hardcoded labels:[] data:[] so chart was always blank.
+        // Dashboard view must pass trend_labels and trend_scores in context.
+        const trendLabels = {{ trend_labels|safe }};
+        const trendScores = {{ trend_scores|safe }};
+
         new Chart(document.getElementById('trendChart'), {
             type: 'line',
             data: {
-                labels: [],
+                labels: trendLabels,
                 datasets: [{
-                    data: [],
+                    data: trendScores,
                     borderColor: '#2d7a52',
                     backgroundColor: 'rgba(45,122,82,0.05)',
                     borderWidth: 2,
@@ -179,7 +187,20 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } }
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        suggestedMin: -2,
+                        suggestedMax: 2,
+                        ticks: {
+                            stepSize: 1,
+                            callback: function(val) {
+                                const labels = {2:'😊', 1:'🙂', 0:'😐', '-1':'😔', '-2':'😟'};
+                                return labels[val] ?? val;
+                            }
+                        }
+                    }
+                }
             }
         });
     </script>
